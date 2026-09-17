@@ -1,0 +1,160 @@
+# Корневой compose для DeliveryService
+# Запуск из корня репозитория:
+#   docker compose up -d --build
+#
+# По мере появления сервисов добавляй блоки по аналогии с users.
+
+name: deliveryservice
+
+services:
+  # ---------------------------------------------------------------------------
+  # Infrastructure
+  # ---------------------------------------------------------------------------
+
+  postgres-users:
+    image: postgres:16-alpine
+    container_name: postgres-users
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_local_pass_123
+      POSTGRES_DB: user_service_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_users_data:/var/lib/postgresql/data
+      - ./scripts/init-users-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_service_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  vault-dev:
+    image: hashicorp/vault:1.17
+    container_name: vault-dev
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    command: server -dev
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+    networks:
+      - backend
+
+  # Одноразовая настройка Transit + RSA-ключ для JWT (users)
+  vault-init:
+    image: hashicorp/vault:1.17
+    container_name: vault-init
+    depends_on:
+      vault-dev:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault-dev:8200
+      VAULT_TOKEN: dev-root-token
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "Waiting for Vault..."
+        i=0
+        while [ $$i -lt 30 ]; do
+          if vault status >/dev/null 2>&1; then
+            break
+          fi
+          i=$$((i+1))
+          sleep 1
+        done
+        echo "Enabling transit..."
+        vault secrets enable transit 2>/dev/null || true
+        echo "Creating JWT signing key..."
+        vault write -f transit/keys/user-service-jwt type=rsa-2048 2>/dev/null || true
+        echo "Vault init done."
+        vault read transit/keys/user-service-jwt || true
+    restart: "no"
+    networks:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # Application services
+  # ---------------------------------------------------------------------------
+
+  users:
+    build:
+      context: ./services/users
+      dockerfile: Dockerfile
+    container_name: users
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: postgres-users
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: dev_local_pass_123
+      DB_NAME: user_service_db
+      VAULT_URL: http://vault-dev:8200
+      VAULT_TOKEN: dev-root-token
+      VAULT_TRANSIT_KEY_NAME: user-service-jwt
+      JWT_EXPIRE_MINUTES: "30"
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+      vault-dev:
+        condition: service_started
+      vault-init:
+        condition: service_completed_successfully
+    # при необходимости миграции перед стартом:
+    # command: >
+    #   sh -c "alembic upgrade head &&
+    #          uvicorn user_service.presentation.main:app --host 0.0.0.0 --port 8000"
+    networks:
+      - backend
+
+  # --- пример для следующего сервиса (раскомментируешь позже) ---
+  # postgres-parcels:
+  #   image: postgres:16-alpine
+  #   container_name: postgres-parcels
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: dev_local_pass_123
+  #     POSTGRES_DB: parcels_db
+  #   ports:
+  #     - "5434:5432"
+  #   volumes:
+  #     - pg_parcels_data:/var/lib/postgresql/data
+  #   networks:
+  #     - backend
+  #
+  # parcels:
+  #   build: ./services/parcels
+  #   ports: ["8001:8000"]
+  #   environment:
+  #     DB_HOST: postgres-parcels
+  #     DB_PORT: 5432
+  #     DB_USER: postgres
+  #     DB_PASSWORD: dev_local_pass_123
+  #     DB_NAME: parcels_db
+  #     USERS_PUBLIC_KEY_URL: http://users:8000/api/v1/keys/public
+  #   depends_on:
+  #     - postgres-parcels
+  #     - users
+  #   networks:
+  #     - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  pg_users_data:
+  # pg_parcels_data:
