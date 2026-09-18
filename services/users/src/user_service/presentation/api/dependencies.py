@@ -70,34 +70,3 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден"
         )
-
-
-# security = HTTPBearer(auto_error=True)
-#
-#
-# async def get_current_user_payload(
-#     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-# ) -> TokenPayload:
-#     token = credentials.credentials
-#     try:
-#         return token_service.decode_token(token)
-#     except InvalidTokenError as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail=str(e) or "Could not validate credentials",
-#             headers={"WWW-Authenticate": "Bearer"},
-#         ) from e
-#     except DomainError as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail=str(e),
-#             headers={"WWW-Authenticate": "Bearer"},
-#         ) from e
-#
-#
-# # Type aliases
-# SessionDep = Annotated[AsyncSession, Depends(get_session)]
-# CurrentUserPayload = Annotated[TokenPayload, Depends(get_current_user_payload)]
-# RegisterUseCaseDep = Annotated[RegisterUser, Depends(get_register_use_case)]
-# AuthenticateUseCaseDep = Annotated[AuthenticateUserUseCase, Depends(get_authenticate_use_case)]
-# GetUserByIdUseCaseDep = Annotated[GetUserByIdUseCase, Depends(get_user_by_id_use_case)]

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from delivery_service.domain.exceptions import (
@@ -16,6 +16,7 @@ from delivery_service.domain.value_objects.parcel_status import ParcelStatus
 #     id: int
 #     name: string
 #     weight: float
+MAX_WEIGHT_KG = 500
 
 
 @dataclass
@@ -41,7 +42,7 @@ class Parcel:
     ) -> "Parcel":
         if not name.strip():
             raise ParcelEmptyNameError("Parcel name cannot be empty")
-        if 500 < weight <= 0:  # constant weight or weight constraint
+        if weight <= 0 or weight > MAX_WEIGHT_KG:
             raise ParcelIncorrectWeightError("Parcel weight cannot be zero or negative")
         if cont_cost < 0:
             raise ParcelIncorrectPriceError("Parcel price cannot be negative")
@@ -57,8 +58,8 @@ class Parcel:
             status=ParcelStatus.ACTIVE,
         )
 
-    def cost_in_usd(self) -> float:
-        return self.content_cost_cents * 0.01
+    def cost_in_usd(self) -> Decimal:
+        return Decimal(self.content_cost_cents) * Decimal("0.01")
 
     def change_type(self, new_type_parcel: ParcelType) -> None:
         self.type = new_type_parcel
@@ -67,23 +68,22 @@ class Parcel:
         self.status = ParcelStatus.CANCELED
 
     def is_delivery_cost_calculated(self) -> bool:
-        if self.status != ParcelStatus.ACTIVE:
-            raise ParcelDeliveryCalculationPriceError("Parcel status is not active")
         return self.delivery_cost_rub > Decimal("0")
 
     def calculate_delivery_cost(self, currency_rate_rub: Decimal) -> None:
-        if self.status == ParcelStatus.ACTIVE:
-            self.delivery_cost_rub = (
-                Decimal(f"{(self.weight_kg * 0.5 + self.cost_in_usd() * 0.01):.3f}")
-                * currency_rate_rub
-            ).quantize(Decimal("1.00"))
-        else:
+        if self.status != ParcelStatus.ACTIVE:
             raise ParcelDeliveryCalculationPriceError("Parcel status is not active")
+        if currency_rate_rub <= Decimal("0"):
+            raise ParcelDeliveryCalculationPriceError("Currency rate must be positive")
+        base = Decimal(str(self.weight_kg)) * Decimal("0.5") + self.cost_in_usd() * Decimal("0.01")
+        self.delivery_cost_rub = (base * currency_rate_rub).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
 
-rate = Decimal("84.17")
-standard = ParcelType(1, "standard")
-parcel = Parcel.register_parcel(uuid.uuid4(), "fff", 232.231, standard, 455)
-
-parcel.calculate_delivery_cost(rate)
-print(parcel.delivery_cost_rub)
+# rate = Decimal("84.17")
+# standard = ParcelType(1, "standard")
+# parcel = Parcel.register_parcel(uuid.uuid4(), "fff", 232.231, standard, 455)
+#
+# parcel.calculate_delivery_cost(rate)
+# print(parcel.delivery_cost_rub)

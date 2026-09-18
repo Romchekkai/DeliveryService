@@ -1,5 +1,7 @@
 from delivery_service.application.dto.parcel_dto import ParcelCreateOutputDTO, ParcelInputDTO
+from delivery_service.application.helpers import format_delivery_cost
 from delivery_service.domain.entities.parcel import Parcel
+from delivery_service.domain.exceptions import ParcelTypeNotFoundError
 from delivery_service.domain.repositories.parcel_repository import ParcelRepository
 from delivery_service.domain.repositories.parcel_type_repository import ParcelTypeRepository
 
@@ -12,7 +14,10 @@ class CreateParcelUseCase:
         self._parcel_type_repo = parcel_type_repository
 
     async def execute(self, parcel_dto: ParcelInputDTO) -> ParcelCreateOutputDTO:
-        type_parcel = self._parcel_type_repo.get_parcel_by_id(parcel_dto.parcel_type_id)
+        type_parcel = await self._parcel_type_repo.get_parcel_by_id(parcel_dto.parcel_type_id)
+
+        if type_parcel is None:
+            raise ParcelTypeNotFoundError(f"Parcel_type {parcel_dto.parcel_type_id} does not exist")
 
         parcel = Parcel.register_parcel(
             owner_id=parcel_dto.user_id,
@@ -28,5 +33,5 @@ class CreateParcelUseCase:
             id=parcel.id,
             name=parcel.name,
             parcel_type=parcel.type,
-            delivery_cost_rub=parcel.delivery_cost_rub,
+            delivery_cost_rub=format_delivery_cost(parcel.delivery_cost_rub),
         )

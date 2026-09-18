@@ -8,11 +8,25 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.20.0",
+    "apscheduler>=3.11.0",
+    "asyncpg>=0.31.0",
     "bcrypt>=5.0.0",
     "cryptography>=50.0.1",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "hvac>=2.4.0",
+    "prometheus-fastapi-instrumentator>=7.1.0",
+    "pydantic-settings>=2.15.0",
     "pyjwt>=2.14.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "redis>=5.2.0",
     "requests>=2.34.2",
+    "sentry-sdk>=2.20.0",
+    "sqlalchemy>=2.0.54",
+    "structlog>=26.1.0",
+    "uvicorn>=0.53.0",
 ]
 
 [project.scripts]

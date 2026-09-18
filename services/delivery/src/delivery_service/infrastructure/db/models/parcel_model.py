@@ -8,7 +8,7 @@ from user_service.infrastructure.db.models import Base
 
 from delivery_service.domain.entities.parcel import Parcel, ParcelType
 from delivery_service.domain.value_objects.parcel_status import ParcelStatus
-from delivery_service.infrastrucrure.db.models.parcel_type_model import ParcelTypeModel
+from delivery_service.infrastructure.db.models.parcel_type_model import ParcelTypeModel
 
 
 class ParcelModel(Base):
@@ -24,7 +24,7 @@ class ParcelModel(Base):
     type_id: Mapped[int] = mapped_column(
         ForeignKey("parcel_type.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False
     )
-    type: Mapped[ParcelTypeModel] = relationship(back_populates="parcel", lazy="joined")
+    type: Mapped[ParcelTypeModel] = relationship(lazy="joined")
 
     content_cost_cents: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -58,8 +58,8 @@ class ParcelModel(Base):
             user_id=parcel.user_id,
             name=parcel.name,
             weight_kg=parcel.weight_kg,
-            type=parcel.type,
+            type_id=parcel.type.id,
             content_cost_cents=parcel.content_cost_cents,
-            delivery_cost_rub=parcel.delivery_cost_rub,
+            delivery_cost_rub=parcel.delivery_cost_rub or None,
             status=parcel.status,
         )

@@ -1,4 +1,3 @@
-# domain/entities/refresh_token.py
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID, uuid4

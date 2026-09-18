@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: users
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["users:8000"]
+        labels:
+          service: users
+
+  - job_name: delivery
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["delivery:8000"]
+        labels:
+          service: delivery
+
+  - job_name: support
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["support:8000"]
+        labels:
+          service: support

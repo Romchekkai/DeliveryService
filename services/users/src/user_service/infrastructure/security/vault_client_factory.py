@@ -1,4 +1,3 @@
-# infrastructure/security/vault_client_factory.py
 import hvac
 import requests.exceptions
 from hvac.exceptions import VaultError

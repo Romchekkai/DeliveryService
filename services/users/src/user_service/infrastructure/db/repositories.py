@@ -72,7 +72,7 @@ class SQLAlchemyRefreshTokenRepository(RefreshTokenRepository):
     async def update(self, token: RefreshToken) -> None:
         model = await self._session.get(RefreshTokenModel, token.id)
         if model is None:
-            raise ValueError(f"Refresh-токен {token.id} не найден для обновления")
+            raise ValueError(f"Refresh-token {token.id} does not exist")
 
         model.revoked = token.revoked
         model.expires_at = token.expires_at

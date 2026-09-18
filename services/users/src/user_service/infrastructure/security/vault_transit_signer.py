@@ -1,4 +1,3 @@
-# infrastructure/security/vault_transit_signer.py (дополнение — обработка ошибок при чтении ключа)
 import base64
 from typing import Any
 

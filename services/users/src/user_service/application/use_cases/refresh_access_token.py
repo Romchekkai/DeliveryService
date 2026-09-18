@@ -24,14 +24,14 @@ class RefreshAccessTokenUseCase:
         stored = await self._refresh_repo.get_by_hash(token_hash)
 
         if stored is None or not stored.is_valid():
-            raise InvalidTokenError("Refresh-токен недействителен или истёк")
+            raise InvalidTokenError("Refresh-token is invalid or expired")
 
         stored.revoke()
         await self._refresh_repo.update(stored)
 
         user = await self._repo.get_by_id(stored.user_id)
         if user is None or not user.is_active():
-            raise InvalidTokenError("Пользователь не найден или неактивен")
+            raise InvalidTokenError("User is not found or isn't inactive")
 
         access_token = self._tokens.generate_access_token(user_id=user.id, role=user.role)
 

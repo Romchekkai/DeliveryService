@@ -31,5 +31,6 @@ def configure_logging(json_logs: bool = True) -> None:
     handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
+    root_logger.handlers.clear()
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)

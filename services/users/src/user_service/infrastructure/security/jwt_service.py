@@ -1,4 +1,3 @@
-# infrastructure/security/jwt_service.py
 import base64
 import json
 from datetime import datetime, timedelta, timezone

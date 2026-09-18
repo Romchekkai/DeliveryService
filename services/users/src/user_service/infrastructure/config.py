@@ -1,4 +1,3 @@
-# infrastructure/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,7 +38,6 @@ class JWTSettings(BaseSettings):
     expire_minutes: int = 30
 
 
-# Инстансы — создаются один раз при импорте модуля, используются везде через импорт
 db_settings = DatabaseSettings()  # type: ignore[call-arg]
 vault_settings = VaultSettings()  # type: ignore[call-arg]
 jwt_settings = JWTSettings()

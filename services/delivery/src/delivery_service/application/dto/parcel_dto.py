@@ -20,11 +20,22 @@ class ParcelCreateOutputDTO:
     id: UUID
     name: str
     parcel_type: ParcelType
-    delivery_cost_rub: Decimal
+    delivery_cost_rub: str
 
 
 @dataclass(frozen=True)
 class ParcelOutputDTO:
+    id: UUID
+    name: str
+    weight_kg: float
+    parcel_type: str
+    content_cost_usd: Decimal
+    delivery_cost_rub: str
+    status: str
+
+
+@dataclass(frozen=True)
+class ParcelOutputShortDTO:
     name: str
     parcel_type: str
-    delivery_cost_rub: Decimal
+    delivery_cost_rub: str

@@ -1,5 +1,5 @@
 class DomainError(Exception):
-    """Base class for exceptions in user domain module."""
+    """Base class for exceptions in delivery domain module."""
 
 
 class ParcelEmptyNameError(DomainError):
@@ -15,4 +15,16 @@ class ParcelIncorrectPriceError(DomainError):
 
 
 class ParcelDeliveryCalculationPriceError(DomainError):
+    pass
+
+
+class ParcelNotFoundError(DomainError):
+    pass
+
+
+class ParcelTypeNotFoundError(DomainError):
+    pass
+
+
+class CurrencyRateUnavailableError(DomainError):
     pass

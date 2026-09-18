@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 def pem_to_jwk(public_key_pem: str, kid: str) -> dict[str, str]:
     public_key = serialization.load_pem_public_key(public_key_pem.encode())
     if not isinstance(public_key, RSAPublicKey):
-        raise TypeError("Ожидался RSA-ключ")
+        raise TypeError("Awaited RSA-key")
     numbers = public_key.public_numbers()
 
     def to_base64url(value: int) -> str:

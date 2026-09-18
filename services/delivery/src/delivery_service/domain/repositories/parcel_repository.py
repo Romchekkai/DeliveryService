@@ -16,3 +16,9 @@ class ParcelRepository(ABC):
 
     @abstractmethod
     async def save_parcel(self, parcel: Parcel) -> None: ...
+
+    @abstractmethod
+    async def get_uncalculated_parcels(self, limit: int = 500) -> list[Parcel]: ...
+
+    @abstractmethod
+    async def save_parcels(self, parcels: list[Parcel]) -> None: ...
