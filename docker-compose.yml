@@ -1,8 +1,12 @@
-# Корневой compose для DeliveryService
-# Запуск из корня репозитория:
+# Запуск всего стека из корня репозитория:
 #   docker compose up -d --build
 #
-# По мере появления сервисов добавляй блоки по аналогии с users.
+# Единая точка входа через nginx: http://localhost
+#   /api/v1/auth/* , /api/v1/keys/*  → users
+#   /api/v1/parcels/* , /api/v1/admin/* → delivery
+#   /api/v1/support/*                → support
+#   /health/users|delivery|support   → healthcheck сервисов
+#   /docs/users|delivery|support     → Swagger
 
 name: deliveryservice
 
@@ -31,6 +35,39 @@ services:
     networks:
       - backend
 
+  postgres-delivery:
+    image: postgres:16-alpine
+    container_name: postgres-delivery
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_local_pass_123
+      POSTGRES_DB: delivery_service_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_delivery_data:/var/lib/postgresql/data
+      - ./scripts/init-delivery-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d delivery_service_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
   vault-dev:
     image: hashicorp/vault:1.17
     container_name: vault-dev
@@ -52,7 +89,6 @@ services:
     networks:
       - backend
 
-  # Одноразовая настройка Transit + RSA-ключ для JWT (users)
   vault-init:
     image: hashicorp/vault:1.17
     container_name: vault-init
@@ -94,8 +130,8 @@ services:
       context: ./services/users
       dockerfile: Dockerfile
     container_name: users
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       DB_HOST: postgres-users
       DB_PORT: 5432
@@ -113,43 +149,101 @@ services:
         condition: service_started
       vault-init:
         condition: service_completed_successfully
-    # при необходимости миграции перед стартом:
-    # command: >
-    #   sh -c "alembic upgrade head &&
-    #          uvicorn user_service.presentation.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - backend
 
-  # --- пример для следующего сервиса (раскомментируешь позже) ---
-  # postgres-parcels:
-  #   image: postgres:16-alpine
-  #   container_name: postgres-parcels
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: dev_local_pass_123
-  #     POSTGRES_DB: parcels_db
-  #   ports:
-  #     - "5434:5432"
-  #   volumes:
-  #     - pg_parcels_data:/var/lib/postgresql/data
-  #   networks:
-  #     - backend
-  #
-  # parcels:
-  #   build: ./services/parcels
-  #   ports: ["8001:8000"]
-  #   environment:
-  #     DB_HOST: postgres-parcels
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: dev_local_pass_123
-  #     DB_NAME: parcels_db
-  #     USERS_PUBLIC_KEY_URL: http://users:8000/api/v1/keys/public
-  #   depends_on:
-  #     - postgres-parcels
-  #     - users
-  #   networks:
-  #     - backend
+  delivery:
+    build:
+      context: ./services/delivery
+      dockerfile: Dockerfile
+    container_name: delivery
+    expose:
+      - "8000"
+    environment:
+      DB_HOST: postgres-delivery
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: dev_local_pass_123
+      DB_NAME: delivery_service_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_RATE_TTL_SECONDS: "3600"
+      FX_URL: https://www.cbr-xml-daily.ru/daily_json.js
+      AUTH_PUBLIC_KEY_URL: http://users:8000/api/v1/keys/public
+      SCHEDULER_ENABLED: "true"
+      SCHEDULER_CALCULATE_COSTS_INTERVAL_MINUTES: "5"
+      ENVIRONMENT: dev
+      JSON_LOGS: "true"
+      SENTRY_DSN: ""
+    depends_on:
+      postgres-delivery:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - backend
+
+  support:
+    build:
+      context: ./services/support
+      dockerfile: Dockerfile
+    container_name: support
+    expose:
+      - "8000"
+    environment:
+      RAG_KNOWLEDGE_BASE_PATH: data/knowledge_base.txt
+      RAG_TOP_K: "4"
+      # Ollama / любой OpenAI-compatible на хосте
+      LLM_BASE_URL: http://host.docker.internal:11434/v1
+      LLM_API_KEY: not-needed
+      LLM_MODEL: llama3.1
+      ENVIRONMENT: dev
+      JSON_LOGS: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    networks:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # Reverse proxy
+  # ---------------------------------------------------------------------------
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      users:
+        condition: service_healthy
+      delivery:
+        condition: service_healthy
+      support:
+        condition: service_started
+    networks:
+      - backend
 
 networks:
   backend:
@@ -157,4 +251,4 @@ networks:
 
 volumes:
   pg_users_data:
-  # pg_parcels_data:
+  pg_delivery_data:

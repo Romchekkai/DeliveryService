@@ -1,8 +1,8 @@
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
-from user_service.infrastructure.db.models import Base
 
 from delivery_service.domain.entities.parcel import ParcelType
+from delivery_service.infrastructure.db.models.base_model import Base
 
 
 class ParcelTypeModel(Base):

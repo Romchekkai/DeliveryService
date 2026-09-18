@@ -28,6 +28,8 @@ def create_app() -> FastAPI:
         description="Ответы на вопросы по правилам доставки и таможни",
         version="0.1.0",
         lifespan=lifespan,
+        openapi_url="/openapi/support.json",
+        docs_url="/docs",
     )
     app.add_middleware(
         CORSMiddleware,

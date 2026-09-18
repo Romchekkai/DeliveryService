@@ -4,19 +4,17 @@ from decimal import Decimal
 from sqlalchemy import CheckConstraint, Enum, Float, ForeignKey, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from user_service.infrastructure.db.models import Base
 
 from delivery_service.domain.entities.parcel import Parcel, ParcelType
 from delivery_service.domain.value_objects.parcel_status import ParcelStatus
+from delivery_service.infrastructure.db.models.base_model import Base
 from delivery_service.infrastructure.db.models.parcel_type_model import ParcelTypeModel
 
 
 class ParcelModel(Base):
     __tablename__ = "parcel"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), unique=True, nullable=False, index=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     weight_kg: Mapped[float] = mapped_column(
         Float, CheckConstraint("weight_kg > 0 and weight_kg < 500"), nullable=False

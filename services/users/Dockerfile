@@ -22,7 +22,7 @@ RUN uv sync --no-dev --no-install-project
 # код
 COPY src ./src
 COPY alembic.ini ./
-COPY migrations ./migrations
+COPY migrations_user ./migrations_user
 COPY README.md ./
 
 RUN uv sync --no-dev

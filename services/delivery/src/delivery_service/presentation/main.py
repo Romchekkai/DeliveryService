@@ -41,6 +41,8 @@ def create_app() -> FastAPI:
         description="Регистрация посылок и расчёт стоимости доставки",
         version="0.1.0",
         lifespan=lifespan,
+        openapi_url="/openapi/delivery.json",
+        docs_url="/docs",
     )
     app.add_middleware(
         CORSMiddleware,

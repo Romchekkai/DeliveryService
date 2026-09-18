@@ -25,6 +25,8 @@ def create_app() -> FastAPI:
         description="User registration, authentication and management service",
         version="0.1.0",
         lifespan=lifespan,
+        openapi_url="/openapi/users.json",
+        docs_url="/docs",
     )
     app.add_middleware(
         CORSMiddleware,
