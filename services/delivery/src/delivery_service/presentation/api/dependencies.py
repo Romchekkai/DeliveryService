@@ -22,7 +22,7 @@ bearer_scheme = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> TokenPayload:
-    """Посылку можно создать только имея валидный токен users-сервиса."""
+    """Parcel credential retrieval"""
     try:
         return await jwt_verifier.verify(credentials.credentials)
     except InvalidTokenError as e:

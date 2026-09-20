@@ -60,13 +60,11 @@ async def get_current_user(
         payload = token_service.decode_token(credentials.credentials)
     except InvalidTokenError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалидный или истёкший токен"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
 
     use_case = GetUserByIdUseCase(user_repository=SqlAlchemyUserRepository(session))
     try:
         return await use_case.execute(payload.user_id)
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")

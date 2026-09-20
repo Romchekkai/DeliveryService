@@ -69,4 +69,4 @@ class CbrCurrencyRateProvider(CurrencyRateProvider):
             return Decimal(str(data["Valute"]["USD"]["Value"]))
         except Exception as e:
             logger.error("fx_rate_fetch_failed", error=str(e), url=self._url)
-            raise CurrencyRateUnavailableError(f"Не удалось получить курс ЦБ: {e}") from e
+            raise CurrencyRateUnavailableError(f"Failed to fetch rate cbr: {e}") from e

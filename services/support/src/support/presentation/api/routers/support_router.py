@@ -26,7 +26,7 @@ def get_answer_use_case() -> AnswerQuestionUseCase:
 @router.post(
     "/ask",
     response_model=AnswerResponse,
-    summary="Задать вопрос службе поддержки (RAG)",
+    summary="Задать вопрос службе поддержки",
 )
 async def ask(
     request: QuestionRequest,

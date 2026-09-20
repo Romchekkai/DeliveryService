@@ -12,13 +12,11 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
     "hvac>=2.4.0",
-    "jwt>=1.4.0",
+    "pyjwt[crypto]>=2.14.0",
     "passlib[bcrypt]>=1.7.4",
     "prometheus-fastapi-instrumentator>=7.1.0",
     "pydantic-settings>=2.15.0",
     "pydantic[email]>=2.13.5",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
     "python-jose[cryptography]>=3.5.0",
     "sqlalchemy>=2.0.52",
     "structlog>=26.1.0",
@@ -35,5 +33,18 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
 ]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+# SQLAlchemy's async layer runs on greenlets; without this the code after every DB `await`
+# is reported as not executed.
+concurrency = ["greenlet", "thread"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

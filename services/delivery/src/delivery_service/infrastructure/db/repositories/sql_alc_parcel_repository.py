@@ -1,7 +1,7 @@
 from typing import Optional, cast
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import Table, bindparam, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from delivery_service.domain.entities.parcel import Parcel
@@ -46,27 +46,42 @@ class SqlAlchemyParcelRepository(ParcelRepository):
 
         await self._async_session.commit()
 
-    async def get_uncalculated_parcels(self, limit: int = 500) -> list[Parcel]:
-        query = (
-            select(ParcelModel)
-            .where(
-                ParcelModel.status == ParcelStatus.ACTIVE,
-            )
-            .limit(limit)
-        )
+    async def get_active_parcels(
+        self, limit: int = 500, after_id: Optional[UUID] = None
+    ) -> list[Parcel]:
+        query = select(ParcelModel).where(ParcelModel.status == ParcelStatus.ACTIVE)
+        if after_id is not None:
+            query = query.where(ParcelModel.id > after_id)
+        query = query.order_by(ParcelModel.id).limit(limit)
+
         result = await self._async_session.execute(query)
         parcels = result.unique().scalars().all()
         return [parcel.to_entity() for parcel in parcels]
 
     async def save_parcels(self, parcels: list[Parcel]) -> None:
-        for parcel in parcels:
-            model = cast(ParcelModel | None, await self._async_session.get(ParcelModel, parcel.id))
-            if model is None:
-                continue
-            else:
-                self._map_entity(model, parcel)
+        if not parcels:
+            return
 
+        table = cast(Table, ParcelModel.__table__)
+        await self._async_session.execute(
+            update(table)
+            .where(table.c.id == bindparam("parcel_id"), table.c.status == ParcelStatus.ACTIVE)
+            .values(delivery_cost_rub=bindparam("cost")),
+            [{"parcel_id": p.id, "cost": p.delivery_cost_rub or None} for p in parcels],
+        )
         await self._async_session.commit()
+
+    # async def save_parcels(self, parcels: list[Parcel]) -> None:
+    #     for parcel in parcels:
+    #         model = cast
+    #         (ParcelModel | None, await self._async_session.get
+    #         (ParcelModel, parcel.id))
+    #         if model is None:
+    #             continue
+    #         else:
+    #             self._map_entity(model, parcel)
+    #
+    #     await self._async_session.commit()
 
     @staticmethod
     def _map_entity(model: ParcelModel, parcel: Parcel) -> None:

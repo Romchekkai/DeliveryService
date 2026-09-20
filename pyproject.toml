@@ -59,6 +59,7 @@ select = ["E", "F", "I", "W"]
 
 [tool.mypy]
 python_version = "3.12"
+exclude = ["(^|/)tests/", "(^|/)migrations/"]
 mypy_path = "services/users/src:services/users:services/delivery/src:services/delivery:services/support/src:services/support"
 explicit_package_bases = true
 strict = true

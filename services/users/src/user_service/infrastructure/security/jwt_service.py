@@ -61,9 +61,9 @@ class VaultJWTTokenService(TokenService):
 
             payload = jwt.decode(token, public_key_pem, algorithms=["RS256"])
         except jwt.ExpiredSignatureError:
-            raise InvalidTokenError("Токен истёк")
+            raise InvalidTokenError("Token expired")
         except jwt.InvalidTokenError:
-            raise InvalidTokenError("Невалидный токен")
+            raise InvalidTokenError("Invalid token")
 
         return TokenPayload(
             user_id=UUID(payload["sub"]),

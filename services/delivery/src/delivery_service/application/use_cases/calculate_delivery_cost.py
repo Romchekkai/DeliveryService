@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import structlog
 
 from delivery_service.application.interfaces.currency_rate_provider import CurrencyRateProvider
@@ -20,8 +22,13 @@ class CalculateDeliveryCostsUseCase:
     async def execute(self) -> int:
         total_updated = 0
         rate = await self._currency_rate_provider.get_usd_rate()
+        last_id: UUID | None = None
         while True:
-            parcels = await self._parcel_repo.get_uncalculated_parcels(limit=self._batch_limit)
+            # Every run recalculates ALL active parcels (the rate changes over time),
+            # each one exactly once: we walk through them in batches by id.
+            parcels = await self._parcel_repo.get_active_parcels(
+                limit=self._batch_limit, after_id=last_id
+            )
             if not parcels:
                 break
 
@@ -30,9 +37,10 @@ class CalculateDeliveryCostsUseCase:
 
             await self._parcel_repo.save_parcels(parcels)
             total_updated += len(parcels)
+            last_id = parcels[-1].id
 
         if total_updated == 0:
-            logger.info("delivery_cost_calculation_skipped", reason="no_uncalculated_parcels")
+            logger.info("delivery_cost_calculation_skipped", reason="no_active_parcels")
         else:
             logger.info(
                 "delivery_cost_calculation_finished",

@@ -33,6 +33,16 @@ dev = [
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
 ]
 
+[tool.coverage.run]
+source = ["src"]
+branch = true
+# SQLAlchemy's async layer runs on greenlets; without this the code after every DB `await`
+# is reported as not executed.
+concurrency = ["greenlet", "thread"]
 
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

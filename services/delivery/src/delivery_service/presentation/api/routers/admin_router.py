@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -39,7 +41,7 @@ async def run_calculate_costs(
 @router.get("", summary="List of recurring tasks")
 async def list_jobs(
     current_user: TokenPayload = Depends(require_admin),
-) -> dict[str, list[dict[str, str | None]]]:
+) -> dict[str, Any]:
     return {
         "running": scheduler.running,
         "jobs": [

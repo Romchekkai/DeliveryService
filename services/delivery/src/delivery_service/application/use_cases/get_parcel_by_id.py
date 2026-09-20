@@ -15,7 +15,7 @@ class GetParcelsByIdUseCase:
         parcel = await self._parcel_repository.get_parcel_by_id(parcel_id)
 
         if parcel is None or parcel.user_id != user_id:
-            raise ParcelNotFoundError(f"Посылка {parcel_id} не найдена")
+            raise ParcelNotFoundError(f"Parcel {parcel_id} not found")
 
         return ParcelOutputDTO(
             id=parcel.id,

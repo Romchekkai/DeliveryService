@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Delivery Service",
-        description="Регистрация посылок и расчёт стоимости доставки",
+        description="Parcel registration service",
         version="0.1.0",
         lifespan=lifespan,
         openapi_url="/openapi/delivery.json",

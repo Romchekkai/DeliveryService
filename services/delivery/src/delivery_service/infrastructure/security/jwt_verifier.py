@@ -59,7 +59,7 @@ class UsersJWTVerifier:
         try:
             payload = jwt.decode(token, public_key, algorithms=[self._algorithm])
         except jwt.ExpiredSignatureError as e:
-            raise InvalidTokenError("Токен истёк") from e
+            raise InvalidTokenError("Token expired") from e
         except jwt.InvalidSignatureError:
             # возможно, ключ был ротирован — пробуем обновить и проверить ещё раз
             public_key = await self._get_public_key(force=True)
@@ -69,8 +69,8 @@ class UsersJWTVerifier:
             try:
                 payload = jwt.decode(token, public_key, algorithms=[self._algorithm])
             except jwt.InvalidTokenError as e:
-                raise InvalidTokenError("Невалидный токен") from e
+                raise InvalidTokenError("Invalid token") from e
         except jwt.InvalidTokenError as e:
-            raise InvalidTokenError("Невалидный токен") from e
+            raise InvalidTokenError("Invalid token") from e
 
         return TokenPayload(user_id=UUID(payload["sub"]), role=payload.get("role", "user"))

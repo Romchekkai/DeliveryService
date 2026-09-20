@@ -1,9 +1,6 @@
 """create parcel tables
-
-Revision ID: e155ba88af1e
-Revises:
-Create Date: 2026-09-18 22:20:21.817521
-
+Revision ID: 703b3dd74ffa
+Revises: Create Date: 2026-09-20 17:09:35.769363
 """
 
 from typing import Sequence, Union
@@ -12,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "e155ba88af1e"
+revision: str = "703b3dd74ffa"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
