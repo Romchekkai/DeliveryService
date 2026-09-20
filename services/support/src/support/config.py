@@ -13,7 +13,6 @@ class RagSettings(BaseSettings):
 class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LLM_", env_file=".env", extra="ignore")
 
-    # любой OpenAI-совместимый endpoint (OpenAI, Ollama, vLLM, LM Studio)
     base_url: str = "http://localhost:11434/v1"
     api_key: str = "not-needed"
     model: str = "llama3.1"

@@ -7,14 +7,14 @@ logger = structlog.get_logger(__name__)
 
 
 class Embedder(ABC):
-    """Порт векторизации — реализацию можно заменить, не трогая поиск."""
+    """Port v"""
 
     @abstractmethod
     def embed(self, texts: list[str]) -> np.ndarray: ...
 
 
 class SentenceTransformerEmbedder(Embedder):
-    """Локальная модель эмбеддингов, без внешних API."""
+    """local model to embed"""
 
     def __init__(self, model_name: str):
         from sentence_transformers import SentenceTransformer

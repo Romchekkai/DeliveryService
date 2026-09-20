@@ -1,7 +1,3 @@
-"""
-Composition root
-"""
-
 import structlog
 
 from support.config import llm_settings, rag_settings
@@ -37,5 +33,5 @@ def build_index() -> InMemoryVectorStore:
 
 def get_vector_store() -> InMemoryVectorStore:
     if vector_store is None:
-        raise RuntimeError("Индекс ещё не построен")
+        raise RuntimeError("Index not built yet")
     return vector_store

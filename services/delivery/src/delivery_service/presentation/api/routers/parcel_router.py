@@ -67,7 +67,7 @@ async def create_parcel(
 @router.get("", response_model=list[ParcelShortResponse])
 async def get_my_parcels(
     limit: int = Query(5, ge=1, le=100),
-    name_filter: str = Query("", description="Фильтр по названию"),
+    name_filter: str = Query("", description="Name filter"),
     current_user: TokenPayload = Depends(get_current_user),
     use_case: GetParcelsByUserUseCase = Depends(get_parcels_by_user_use_case),
 ) -> list[ParcelShortResponse]:

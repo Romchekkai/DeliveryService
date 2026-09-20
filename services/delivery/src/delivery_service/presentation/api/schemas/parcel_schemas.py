@@ -7,7 +7,7 @@ class ParcelCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     weight_kg: float = Field(gt=0, lt=500)
     parcel_type_id: int
-    content_cost_cents: int = Field(ge=0, description="Стоимость содержимого в центах")
+    content_cost_cents: int = Field(ge=0, description="Content cost in cents")
 
 
 class ParcelCreateResponse(BaseModel):

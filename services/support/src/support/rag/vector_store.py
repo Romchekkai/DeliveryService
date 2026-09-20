@@ -8,11 +8,7 @@ logger = structlog.get_logger(__name__)
 
 
 class InMemoryVectorStore:
-    """Векторный поиск косинусной близостью.
-
-    База знаний маленькая (один файл), отдельная векторная БД избыточна —
-    держим матрицу эмбеддингов в памяти.
-    """
+    """Векторный поиск косинусной близостью.БД - файл"""
 
     def __init__(self, embedder: Embedder):
         self._embedder = embedder

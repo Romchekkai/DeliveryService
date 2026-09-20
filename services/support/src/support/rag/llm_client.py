@@ -21,7 +21,7 @@ class LLMClient(ABC):
 
 
 class OpenAICompatibleLLMClient(LLMClient):
-    """Работает с любым OpenAI-совместимым API: OpenAI, Ollama, vLLM, LM Studio."""
+    """Available API: OpenAI, Ollama, vLLM, LM Studio."""
 
     def __init__(
         self,

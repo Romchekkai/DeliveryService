@@ -26,7 +26,8 @@ def get_answer_use_case() -> AnswerQuestionUseCase:
 @router.post(
     "/ask",
     response_model=AnswerResponse,
-    summary="Задать вопрос службе поддержки",
+    summary="Ask a question for support.",
+    tags=["support"],
 )
 async def ask(
     request: QuestionRequest,
@@ -38,7 +39,7 @@ async def ask(
         logger.error("rag_failed", question=request.question, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Сервис поддержки временно недоступен",
+            detail="Support service is unavailable",
         ) from e
 
     return AnswerResponse(
