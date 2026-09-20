@@ -1,0 +1,321 @@
+#   docker compose up -d --build
+#
+# Единая точка входа через nginx: http://localhost
+#   /api/v1/auth/* , /api/v1/keys/*  → users
+#   /api/v1/parcels/* , /api/v1/admin/* → delivery
+#   /api/v1/support/*                → support
+#   /health/users|delivery|support   → healthcheck сервисов
+#   /docs/users|delivery|support     → Swagger
+
+name: deliveryservice
+
+services:
+  # ---------------------------------------------------------------------------
+  # Infrastructure
+  # ---------------------------------------------------------------------------
+
+  postgres-users:
+    image: postgres:16-alpine
+    container_name: postgres-users
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_local_pass_123
+      POSTGRES_DB: user_service_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_users_data:/var/lib/postgresql/data
+      - ./scripts/init-users-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_service_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  postgres-delivery:
+    image: postgres:16-alpine
+    container_name: postgres-delivery
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_local_pass_123
+      POSTGRES_DB: delivery_service_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_delivery_data:/var/lib/postgresql/data
+      - ./scripts/init-delivery-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d delivery_service_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - backend
+
+  vault-dev:
+    image: hashicorp/vault:1.17
+    container_name: vault-dev
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    command: server -dev
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+    networks:
+      - backend
+
+  vault-init:
+    image: hashicorp/vault:1.17
+    container_name: vault-init
+    depends_on:
+      vault-dev:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault-dev:8200
+      VAULT_TOKEN: dev-root-token
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "Waiting for Vault..."
+        i=0
+        while [ $$i -lt 30 ]; do
+          if vault status >/dev/null 2>&1; then
+            break
+          fi
+          i=$$((i+1))
+          sleep 1
+        done
+        echo "Enabling transit..."
+        vault secrets enable transit 2>/dev/null || true
+        echo "Creating JWT signing key..."
+        vault write -f transit/keys/user-service-jwt type=rsa-2048 2>/dev/null || true
+        echo "Vault init done."
+        vault read transit/keys/user-service-jwt || true
+    restart: "no"
+    networks:
+      - backend
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - backend
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: loki
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    networks:
+      - backend
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    container_name: promtail
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./observability/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # Application services
+  # ---------------------------------------------------------------------------
+
+  users:
+    build:
+      context: ./services/users
+      dockerfile: Dockerfile
+    container_name: users
+    expose:
+      - "8000"
+    environment:
+      DB_HOST: postgres-users
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: dev_local_pass_123
+      DB_NAME: user_service_db
+      VAULT_URL: http://vault-dev:8200
+      VAULT_TOKEN: dev-root-token
+      VAULT_TRANSIT_KEY_NAME: user-service-jwt
+      JWT_EXPIRE_MINUTES: "30"
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+      vault-dev:
+        condition: service_started
+      vault-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+
+  delivery:
+    build:
+      context: ./services/delivery
+      dockerfile: Dockerfile
+    container_name: delivery
+    expose:
+      - "8000"
+    environment:
+      DB_HOST: postgres-delivery
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: dev_local_pass_123
+      DB_NAME: delivery_service_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_RATE_TTL_SECONDS: "3600"
+      FX_URL: https://www.cbr-xml-daily.ru/daily_json.js
+      AUTH_PUBLIC_KEY_URL: http://users:8000/api/v1/keys/public
+      SCHEDULER_ENABLED: "true"
+      SCHEDULER_CALCULATE_COSTS_INTERVAL_MINUTES: "5"
+      ENVIRONMENT: dev
+      JSON_LOGS: "true"
+      SENTRY_DSN: ""
+    depends_on:
+      postgres-delivery:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - backend
+
+  support:
+    build:
+      context: ./services/support
+      dockerfile: Dockerfile
+    container_name: support
+    ports:
+      - "8002:8000"
+    environment:
+      RAG_KNOWLEDGE_BASE_PATH: data/knowledge_base.txt
+      RAG_TOP_K: "4"
+      LLM_BASE_URL: http://ollama:11434/v1
+      LLM_API_KEY: not-needed
+      LLM_MODEL: llama3.1
+      ENVIRONMENT: dev
+      JSON_LOGS: "true"
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    volumes:
+      - hf_cache:/app/.cache/huggingface
+    networks:
+      - backend
+    depends_on:
+      - ollama
+
+  # ---------------------------------------------------------------------------
+  # Reverse proxy
+  # ---------------------------------------------------------------------------
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      users:
+        condition: service_healthy
+      delivery:
+        condition: service_healthy
+      support:
+        condition: service_started
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  pg_users_data:
+  pg_delivery_data:
+  ollama_data:
+  hf_cache:
+  prometheus_data:
+  loki_data:
+  grafana_data:

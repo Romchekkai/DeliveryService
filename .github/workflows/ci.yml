@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+# a new push to the same branch/PR cancels the previous run
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      # only the root dev group (ruff, mypy, ...) - no service dependencies needed for linting
+      - run: uv sync --only-group dev
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
+
+  typecheck:
+    name: typecheck (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      # mypy needs the dependencies of the services it checks (the heavy `support` service with
+      # sentence-transformers/torch is deliberately not installed)
+      - run: >
+          uv sync
+          --package deliveryservice --package user-service --package delivery-service
+          --group dev
+      - run: uv run --no-sync mypy services/users services/delivery
+
+  test:
+    name: test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: users
+            package: user-service
+            test_db: user_service_db_test
+          - service: delivery
+            package: delivery-service
+            test_db: delivery_service_db_test
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ${{ matrix.test_db }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      TEST_DB_NAME: ${{ matrix.test_db }}
+      # fail instead of silently skipping DB tests when PostgreSQL is unreachable
+      REQUIRE_DB: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install ${{ matrix.package }} (and only it)
+        run: uv sync --package ${{ matrix.package }} --group dev
+
+      - name: Unit tests
+        working-directory: services/${{ matrix.service }}
+        run: uv run --no-sync pytest -m unit --cov
+
+      - name: Integration tests (PostgreSQL) + coverage
+        working-directory: services/${{ matrix.service }}
+        run: >
+          uv run --no-sync pytest -m integration
+          --cov --cov-append --cov-fail-under=85
+
+      - name: Coverage summary
+        if: always()
+        working-directory: services/${{ matrix.service }}
+        run: uv run --no-sync coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY" || true
+
+  docker:
+    name: docker build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [users, delivery]
+    steps:
+      - uses: actions/checkout@v6
+      # The images resolve their dependencies from the service's own pyproject.toml (no root
+      # uv.lock in the build context), so this catches problems the workspace env can not see.
+      - name: Build image
+        run: docker build -t ${{ matrix.service }}:ci services/${{ matrix.service }}
+      - name: users - PyJWT (not the unrelated `jwt` package) is installed
+        if: matrix.service == 'users'
+        run: >
+          docker run --rm --entrypoint uv users:ci run python -c
+          "import jwt; assert hasattr(jwt, 'get_unverified_header'), 'wrong jwt package'"
+      - name: delivery - the application imports
+        if: matrix.service == 'delivery'
+        run: >
+          docker run --rm -e DB_PASSWORD=ci --entrypoint uv delivery:ci
+          run python -c "import delivery_service.presentation.main"
+
+  nginx:
+    name: nginx config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: nginx -t
+        run: >
+          docker run --rm
+          --add-host users:127.0.0.1 --add-host delivery:127.0.0.1 --add-host support:127.0.0.1
+          -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+          nginx:1.27-alpine nginx -t

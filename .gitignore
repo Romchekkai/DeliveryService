@@ -1,0 +1,34 @@
+# виртуальное окружение (общее, в корне workspace)
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# кэши инструментов
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# секреты и локальные конфиги
+.env
+.env.local
+*/.env
+*.env.*.local
+
+# IDE
+.idea/
+
+# ОС
+.DS_Store
+Thumbs.db
+
+# логи
+*.log
+logs/
